@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyClock</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛅</text></svg>">
+<style>
+:root {
+  --bg: #0d1424; --bg2: #18233b; --card: rgba(255,255,255,.06); --border: rgba(255,255,255,.1);
+  --text: #e8eefc; --muted: #93a1bf; --accent: #6cb4ff; --warm: #ffb85c;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #eaf2fc; --bg2: #ffffff; --card: rgba(255,255,255,.75); --border: rgba(20,40,80,.1);
+  --text: #16223a; --muted: #5c6b88; --accent: #1f6fd1; --warm: #d97706;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh; color: var(--text);
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: radial-gradient(1200px 600px at 10% -10%, var(--bg2), var(--bg)) fixed;
+}
+button, input { font: inherit; color: inherit; }
+button {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+header {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  max-width: 1200px; margin: 0 auto; padding: 16px;
+}
+h1 { font-size: 20px; margin: 0 auto 0 0; }
+.search { position: relative; flex: 1 1 220px; max-width: 340px; }
+.search input, .addclock input {
+  width: 100%; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--card);
+}
+#results {
+  position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin: 4px 0 0; padding: 4px;
+  list-style: none; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
+}
+#results:empty { display: none; }
+#results li { padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+#results li:hover, #results li:focus { background: var(--card); outline: none; }
+#results small { color: var(--muted); }
+main {
+  display: grid; gap: 16px; max-width: 1200px; margin: 0 auto; padding: 0 16px 32px;
+  grid-template-columns: repeat(12, 1fr);
+}
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+  padding: 18px; backdrop-filter: blur(10px); min-width: 0;
+}
+.card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+.clock { grid-column: span 5; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+#time { font-size: clamp(56px, 9vw, 96px); font-weight: 200; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1; }
+#time .sec { font-size: .4em; color: var(--muted); }
+#date { color: var(--muted); margin-top: 8px; font-size: 17px; }
+.now { grid-column: span 7; }
+.now-top { display: flex; align-items: center; gap: 16px; }
+#nowIcon { font-size: 72px; line-height: 1; }
+#nowTemp { font-size: 64px; font-weight: 300; line-height: 1; }
+#nowDesc { color: var(--muted); }
+#place { font-weight: 600; font-size: 17px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+.stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+.stat span { display: block; font-size: 12px; color: var(--muted); }
+.stat b { font-size: 18px; font-weight: 600; }
+.hourly { grid-column: span 12; }
+#hours { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.hour { flex: 0 0 64px; text-align: center; padding: 10px 4px; border-radius: 12px; background: var(--card); scroll-snap-align: start; }
+.hour .i { font-size: 24px; margin: 4px 0; }
+.hour small { color: var(--muted); display: block; }
+.hour .rain { color: var(--accent); font-size: 12px; }
+.daily { grid-column: span 5; }
+.day { display: grid; grid-template-columns: 52px 30px 40px 1fr 40px; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--border); }
+.day:first-of-type { border-top: 0; }
+.day .i { font-size: 22px; text-align: center; }
+.day .lo { color: var(--muted); text-align: right; }
+.day .rain { color: var(--accent); font-size: 12px; }
+.bar { height: 6px; border-radius: 3px; background: var(--border); position: relative; }
+.bar i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--warm)); }
+.sky { grid-column: span 3; }
+.sun-row { display: flex; justify-content: space-between; }
+.sun-row b { font-size: 20px; font-weight: 600; }
+.sun-row span { display: block; font-size: 12px; color: var(--muted); }
+#sunArc { width: 100%; height: auto; margin: 6px 0; }
+.moon { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+#moonIcon { font-size: 44px; line-height: 1; }
+.muted { color: var(--muted); font-size: 13px; }
+.world { grid-column: span 4; }
+.wc { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.wc:first-child { border-top: 0; }
+.wc .n { flex: 1; min-width: 0; }
+.wc .n b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wc .t { font-size: 22px; font-variant-numeric: tabular-nums; }
+.wc button { padding: 2px 8px; border: 0; background: none; color: var(--muted); font-size: 18px; }
+.wc button:hover { color: #f66; }
+.addclock { display: flex; gap: 8px; margin-top: 12px; }
+#msg { grid-column: span 12; text-align: center; color: var(--warm); }
+#msg:empty { display: none; }
+@media (max-width: 960px) {
+  .clock, .now { grid-column: span 12; }
+  .daily { grid-column: span 12; }
+  .sky, .world { grid-column: span 6; }
+}
+@media (max-width: 640px) {
+  .sky, .world { grid-column: span 12; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  #nowIcon { font-size: 56px; } #nowTemp { font-size: 52px; }
+  h1 { flex-basis: 100%; }
+  .search { max-width: none; flex-basis: 120px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>⛅ SkyClock</h1>
+  <div class="search">
+    <input id="q" type="search" placeholder="Search a city…" autocomplete="off" aria-label="Search a city">
+    <ul id="results" role="listbox"></ul>
+  </div>
+  <button id="locate" title="Use my location" aria-label="Use my location">📍</button>
+  <button id="unit" title="Switch °C / °F">°C</button>
+  <button id="theme" title="Switch theme" aria-label="Switch theme">🌙</button>
+</header>
+<main>
+  <div id="msg"></div>
+  <section class="card clock">
+    <div id="time">--:--</div>
+    <div id="date"></div>
+    <div class="muted" id="tzName" style="margin-top:6px"></div>
+  </section>
+  <section class="card now">
+    <div id="place">Loading…</div>
+    <div class="now-top">
+      <div id="nowIcon">⏳</div>
+      <div><div id="nowTemp">--</div><div id="nowDesc"></div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>Feels like</span><b id="feels">--</b></div>
+      <div class="stat"><span>Humidity</span><b id="hum">--</b></div>
+      <div class="stat"><span>Wind</span><b id="wind">--</b></div>
+      <div class="stat"><span>UV index</span><b id="uv">--</b></div>
+    </div>
+  </section>
+  <section class="card hourly"><h2>Next 24 hours</h2><div id="hours"></div></section>
+  <section class="card daily"><h2>7-day forecast</h2><div id="days"></div></section>
+  <section class="card sky">
+    <h2>Sun &amp; Moon</h2>
+    <div class="sun-row">
+      <div><span>🌅 Sunrise</span><b id="rise">--</b></div>
+      <div style="text-align:right"><span>Sunset 🌇</span><b id="set">--</b></div>
+    </div>
+    <svg id="sunArc" viewBox="0 0 200 70" aria-hidden="true">
+      <path d="M10 64 Q100 -16 190 64" fill="none" stroke="var(--border)" stroke-width="3" stroke-dasharray="4 5"/>
+      <line x1="0" y1="64" x2="200" y2="64" stroke="var(--border)"/>
+      <circle id="sunDot" r="7" fill="var(--warm)" cx="10" cy="64"/>
+    </svg>
+    <div class="muted" id="dayLen"></div>
+    <div class="moon">
+      <div id="moonIcon">🌑</div>
+      <div><b id="moonName"></b><div class="muted" id="moonInfo"></div></div>
+    </div>
+  </section>
+  <section class="card world">
+    <h2>World clocks</h2>
+    <div id="clocks"></div>
+    <form class="addclock" id="addForm">
+      <input id="tzIn" list="tzList" placeholder="Add a time zone, e.g. Tokyo" aria-label="Add a time zone">
+      <datalist id="tzList"></datalist>
+      <button>Add</button>
+    </form>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+// ---------- theme & units ----------
+let theme = store.get('sc-theme', matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+let fahrenheit = store.get('sc-f', navigator.language === 'en-US');
+function applyTheme() { document.documentElement.dataset.theme = theme; $('theme').textContent = theme === 'dark' ? '☀️' : '🌙'; }
+$('theme').onclick = () => { theme = theme === 'dark' ? 'light' : 'dark'; store.set('sc-theme', theme); applyTheme(); };
+$('unit').onclick = () => { fahrenheit = !fahrenheit; store.set('sc-f', fahrenheit); render(); };
+applyTheme();
+const T = c => Math.round(fahrenheit ? c * 9 / 5 + 32 : c) + '°';
+const W = k => fahrenheit ? Math.round(k / 1.609) + ' mph' : Math.round(k) + ' km/h';
+
+// ---------- WMO weather codes ----------
+const CODES = {
+  0: ['Clear sky', '☀️', '🌙'], 1: ['Mainly clear', '🌤️', '🌙'], 2: ['Partly cloudy', '⛅', '☁️'], 3: ['Overcast', '☁️'],
+  45: ['Fog', '🌫️'], 48: ['Freezing fog', '🌫️'],
+  51: ['Light drizzle', '🌦️'], 53: ['Drizzle', '🌦️'], 55: ['Heavy drizzle', '🌧️'], 56: ['Freezing drizzle', '🌧️'], 57: ['Freezing drizzle', '🌧️'],
+  61: ['Light rain', '🌦️'], 63: ['Rain', '🌧️'], 65: ['Heavy rain', '🌧️'], 66: ['Freezing rain', '🌧️'], 67: ['Freezing rain', '🌧️'],
+  71: ['Light snow', '🌨️'], 73: ['Snow', '🌨️'], 75: ['Heavy snow', '❄️'], 77: ['Snow grains', '🌨️'],
+  80: ['Rain showers', '🌦️'], 81: ['Rain showers', '🌧️'], 82: ['Violent showers', '⛈️'], 85: ['Snow showers', '🌨️'], 86: ['Snow showers', '❄️'],
+  95: ['Thunderstorm', '⛈️'], 96: ['Thunderstorm, hail', '⛈️'], 99: ['Thunderstorm, hail', '⛈️'],
+};
+const desc = c => (CODES[c] || ['Unknown'])[0];
+const icon = (c, day = 1) => { const e = CODES[c] || ['', '❔']; return (!day && e[2]) || e[1]; };
+const uvLabel = u => u < 3 ? 'Low' : u < 6 ? 'Moderate' : u < 8 ? 'High' : u < 11 ? 'Very high' : 'Extreme';
+const compass = d => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(d / 45) % 8];
+const hhmm = iso => iso.slice(11, 16);   // Open-Meteo times are already local to the place (timezone=auto)
+const mins = iso => +iso.slice(11, 13) * 60 + +iso.slice(14, 16);
+
+// ---------- weather ----------
+let place = store.get('sc-place', null), data = null;
+async function loadWeather() {
+  if (!place) return;
+  const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + place.lat + '&longitude=' + place.lon +
+    '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,uv_index' +
+    '&hourly=temperature_2m,weather_code,precipitation_probability,is_day' +
+    '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max' +
+    '&timezone=auto&forecast_days=7';
+  try {
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(r.status);
+    data = await r.json();
+    $('msg').textContent = '';
+    render();
+  } catch (e) {
+    $('msg').textContent = 'Could not load weather (' + e.message + '). Retrying soon.';
+  }
+}
+
+function render() {
+  $('unit').textContent = fahrenheit ? '°F' : '°C';
+  if (!data) return;
+  const c = data.current, h = data.hourly, d = data.daily;
+  $('place').textContent = place.name;
+  $('nowIcon').textContent = icon(c.weather_code, c.is_day);
+  $('nowTemp').textContent = T(c.temperature_2m);
+  $('nowDesc').textContent = desc(c.weather_code) + ' · H ' + T(d.temperature_2m_max[0]) + ' L ' + T(d.temperature_2m_min[0]);
+  $('feels').textContent = T(c.apparent_temperature);
+  $('hum').textContent = c.relative_humidity_2m + '%';
+  $('wind').textContent = W(c.wind_speed_10m) + ' ' + compass(c.wind_direction_10m);
+  $('uv').textContent = Math.round(c.uv_index) + ' ' + uvLabel(c.uv_index);
+
+  let i0 = h.time.findIndex(t => t.slice(0, 13) === c.time.slice(0, 13));
+  if (i0 < 0) i0 = 0;
+  $('hours').innerHTML = h.time.slice(i0, i0 + 24).map((t, k) => {
+    const i = i0 + k, p = h.precipitation_probability[i];
+    return `<div class="hour"><small>${k ? hhmm(t) : 'Now'}</small><div class="i">${icon(h.weather_code[i], h.is_day[i])}</div>` +
+      `<b>${T(h.temperature_2m[i])}</b><div class="rain">${p >= 10 ? '💧' + p + '%' : '&nbsp;'}</div></div>`;
+  }).join('');
+
+  const lo = Math.min(...d.temperature_2m_min), span = Math.max(...d.temperature_2m_max) - lo || 1;
+  $('days').innerHTML = d.time.map((t, i) => {
+    const name = i ? new Date(t + 'T12:00').toLocaleDateString(undefined, { weekday: 'short' }) : 'Today';
+    const a = (d.temperature_2m_min[i] - lo) / span * 100, b = (d.temperature_2m_max[i] - lo) / span * 100;
+    const p = d.precipitation_probability_max[i];
+    return `<div class="day" title="${desc(d.weather_code[i])}, UV ${Math.round(d.uv_index_max[i])}"><b>${name}</b>` +
+      `<div class="i">${icon(d.weather_code[i])}</div><span class="lo">${T(d.temperature_2m_min[i])}</span>` +
+      `<div><div class="bar"><i style="left:${a}%;right:${100 - b}%"></i></div>${p >= 20 ? `<div class="rain">💧${p}%</div>` : ''}</div>` +
+      `<b>${T(d.temperature_2m_max[i])}</b></div>`;
+  }).join('');
+
+  const rise = d.sunrise[0], set = d.sunset[0], len = mins(set) - mins(rise);
+  $('rise').textContent = hhmm(rise);
+  $('set').textContent = hhmm(set);
+  $('dayLen').textContent = 'Daylight ' + Math.floor(len / 60) + 'h ' + len % 60 + 'm' +
+    (data.timezone !== Intl.DateTimeFormat().resolvedOptions().timeZone ? ' · local time in ' + place.name.split(',')[0] : '');
+  const f = Math.min(1, Math.max(0, (mins(c.time) - mins(rise)) / len));   // quadratic bezier point on the arc
+  const dot = $('sunDot');
+  dot.setAttribute('cx', 10 + 180 * f);
+  dot.setAttribute('cy', (1 - f) ** 2 * 64 + 2 * (1 - f) * f * -16 + f * f * 64);
+  dot.style.opacity = c.is_day ? 1 : .3;
+}
+
+function setPlace(p) { place = p; store.set('sc-place', p); data = null; $('place').textContent = p.name; loadWeather(); }
+
+function locate() {
+  if (!navigator.geolocation) return fallback('Geolocation is not available.');
+  $('place').textContent = 'Finding you…';
+  navigator.geolocation.getCurrentPosition(
+    pos => setPlace({ name: 'My location', lat: +pos.coords.latitude.toFixed(3), lon: +pos.coords.longitude.toFixed(3) }),
+    err => fallback('Location unavailable (' + err.message + '). Search for a city above.'),
+    { timeout: 10000, maximumAge: 600000 });
+}
+function fallback(m) {
+  $('msg').textContent = m;
+  if (!place) setPlace({ name: 'London, United Kingdom', lat: 51.507, lon: -0.128 });
+  else $('place').textContent = place.name;
+}
+$('locate').onclick = locate;
+
+// ---------- city search ----------
+let timer, found = [];
+$('q').oninput = () => {
+  clearTimeout(timer);
+  const q = $('q').value.trim();
+  if (q.length < 2) { $('results').innerHTML = ''; return; }
+  timer = setTimeout(async () => {
+    try {
+      const r = await fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name=' + encodeURIComponent(q));
+      found = (await r.json()).results || [];
+    } catch { found = []; }
+    if ($('q').value.trim() !== q) return;
+    $('results').innerHTML = found.length ? found.map((p, i) =>
+      `<li tabindex="0" role="option" data-i="${i}">${esc(p.name)} <small>${esc([p.admin1, p.country].filter(Boolean).join(', '))}</small></li>`).join('')
+      : '<li>No matches</li>';
+  }, 250);
+};
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+function pick(li) {
+  const p = found[li?.dataset.i];
+  if (!p) return;
+  setPlace({ name: p.name + ', ' + (p.country || p.admin1 || ''), lat: p.latitude, lon: p.longitude });
+  $('msg').textContent = '';
+  $('q').value = ''; $('results').innerHTML = '';
+}
+$('results').onclick = e => pick(e.target.closest('li'));
+$('results').onkeydown = e => { if (e.key === 'Enter') pick(e.target.closest('li')); };
+$('q').onkeydown = e => {
+  if (e.key === 'Enter') pick($('results').querySelector('li'));
+  if (e.key === 'ArrowDown') { e.preventDefault(); $('results').querySelector('li')?.focus(); }
+};
+document.addEventListener('click', e => { if (!e.target.closest('.search')) $('results').innerHTML = ''; });
+
+// ---------- moon (computed locally) ----------
+const SYNODIC = 29.530588853, NEW_MOON_REF = Date.UTC(2000, 0, 6, 18, 14);
+function moonPhase(date) {   // 0 = new, 0.5 = full
+  return (((date - NEW_MOON_REF) / 864e5 / SYNODIC) % 1 + 1) % 1;
+}
+console.assert(Math.min(moonPhase(Date.UTC(2024, 0, 11, 11, 57)), 1 - moonPhase(Date.UTC(2024, 0, 11, 11, 57))) < 0.02, 'new moon check');
+console.assert(Math.abs(moonPhase(Date.UTC(2024, 0, 25, 17, 54)) - 0.5) < 0.02, 'full moon check');
+function renderMoon() {
+  const p = moonPhase(Date.now()), k = Math.round(p * 8) % 8;
+  const names = ['New moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'];
+  $('moonIcon').textContent = '🌑🌒🌓🌔🌕🌖🌗🌘'.match(/../gu)[k];
+  $('moonName').textContent = names[k];
+  const age = p * SYNODIC, toFull = ((0.5 - p + 1) % 1) * SYNODIC;
+  $('moonInfo').textContent = Math.round((1 - Math.cos(2 * Math.PI * p)) * 50) + '% lit · day ' + Math.floor(age) +
+    ' · full in ' + Math.round(toFull) + 'd';
+}
+
+// ---------- clocks ----------
+const localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [];
+const cityOf = z => z.split('/').pop().replace(/_/g, ' ');
+$('tzList').innerHTML = zones.map(z => `<option value="${z}">${cityOf(z)}</option>`).join('');
+let clocks = store.get('sc-clocks', ['America/New_York', 'Europe/London', 'Asia/Tokyo']);
+const fmtCache = {};
+const fmt = (z, o) => fmtCache[z + JSON.stringify(o)] ??= new Intl.DateTimeFormat(undefined, { timeZone: z, ...o });
+
+function renderClocks() {
+  $('clocks').innerHTML = clocks.map((z, i) => `<div class="wc"><div class="n"><b>${esc(cityOf(z))}</b>` +
+    `<span class="muted" data-o="${i}"></span></div><span class="t" data-t="${i}"></span>` +
+    `<button data-x="${i}" title="Remove" aria-label="Remove ${esc(cityOf(z))}">×</button></div>`).join('') ||
+    '<div class="muted">No world clocks yet. Add one below.</div>';
+  tick();
+}
+$('clocks').onclick = e => {
+  const i = e.target.dataset.x;
+  if (i != null) { clocks.splice(i, 1); store.set('sc-clocks', clocks); renderClocks(); }
+};
+$('addForm').onsubmit = e => {
+  e.preventDefault();
+  const v = $('tzIn').value.trim().toLowerCase();
+  const z = zones.find(z => z.toLowerCase() === v) || zones.find(z => cityOf(z).toLowerCase() === v) ||
+    zones.find(z => z.toLowerCase().includes(v.replace(/ /g, '_')));
+  if (!v || !z) { $('tzIn').setCustomValidity('Unknown time zone'); $('tzIn').reportValidity(); return; }
+  if (!clocks.includes(z)) clocks.push(z);
+  store.set('sc-clocks', clocks); $('tzIn').value = ''; renderClocks();
+};
+$('tzIn').oninput = () => $('tzIn').setCustomValidity('');
+
+const dayNum = (z, now) => fmt(z, { year: 'numeric', month: 'numeric', day: 'numeric' }).format(now);
+function tick() {
+  const now = new Date();
+  const [hm, sec] = [fmt(localTZ, { hour: '2-digit', minute: '2-digit' }).format(now), String(now.getSeconds()).padStart(2, '0')];
+  $('time').innerHTML = hm.replace(/\s?([AP]M)/i, '') + `<span class="sec">:${sec}${/PM/i.test(hm) ? ' PM' : /AM/i.test(hm) ? ' AM' : ''}</span>`;
+  $('date').textContent = fmt(localTZ, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
+  $('tzName').textContent = cityOf(localTZ) + ' · ' + fmt(localTZ, { timeZoneName: 'shortOffset' }).formatToParts(now).find(p => p.type === 'timeZoneName').value;
+  const today = dayNum(localTZ, now);
+  clocks.forEach((z, i) => {
+    const t = document.querySelector(`[data-t="${i}"]`), o = document.querySelector(`[data-o="${i}"]`);
+    if (!t) return;
+    t.textContent = fmt(z, { hour: '2-digit', minute: '2-digit' }).format(now);
+    const d = dayNum(z, now), off = fmt(z, { timeZoneName: 'shortOffset' }).formatToParts(now).find(p => p.type === 'timeZoneName').value;
+    const hr = +fmt(z, { hour: 'numeric', hourCycle: 'h23' }).format(now);
+    o.textContent = (hr >= 6 && hr < 18 ? '☀️ ' : '🌙 ') + (d === today ? 'Today' : new Date(now.toLocaleString('en-US', { timeZone: z })) > new Date(now.toLocaleString('en-US', { timeZone: localTZ })) ? 'Tomorrow' : 'Yesterday') + ' · ' + off;
+  });
+}
+
+// ---------- start ----------
+renderClocks(); renderMoon(); render();
+setInterval(tick, 1000);
+setInterval(() => { renderMoon(); loadWeather(); }, 15 * 60 * 1000);
+if (place) loadWeather(); else locate();
+</script>
+</body>
+</html>
